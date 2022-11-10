@@ -10,8 +10,7 @@ import torch.nn.functional as F
 import wandb
 from loguru import logger
 from utils.dataset import tokenize
-from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather,
-                        trainMetricGPU)
+from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather, trainMetricGPU, get_seg_image)
 
 
 def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
@@ -155,13 +154,14 @@ def inference(test_loader, model, args):
         mask = cv2.imread(param['mask_dir'][0], flags=cv2.IMREAD_GRAYSCALE)
         # dump image & mask
         if args.visualize:
-            seg_id = param['seg_id'][0].cpu().numpy()
+            # seg_id = param['seg_id'][0].cpu().numpy()
+            seg_id = param['seg_id'][0]
             img_name = '{}-img.jpg'.format(seg_id)
             mask_name = '{}-mask.png'.format(seg_id)
-            cv2.imwrite(filename=os.path.join(args.vis_dir, img_name),
-                        img=param['ori_img'][0].cpu().numpy())
-            cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
-                        img=mask)
+            cv2.imwrite(filename=os.path.join(args.vis_dir, img_name), img=param['ori_img'][0].cpu().numpy())
+            # cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name), img=mask)
+            cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name), img=get_seg_image(param['ori_img'][0].cpu().numpy(), mask))
+
         # multiple sentences
         for sent in param['sents']:
             mask = mask / 255.
@@ -170,6 +170,7 @@ def inference(test_loader, model, args):
             # inference
             pred = model(img, text)
             pred = torch.sigmoid(pred)
+
             if pred.shape[-2:] != img.shape[-2:]:
                 pred = F.interpolate(pred,
                                      size=img.shape[-2:],
@@ -183,6 +184,7 @@ def inference(test_loader, model, args):
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
             pred = np.array(pred > 0.35)
+
             # iou
             inter = np.logical_and(pred, mask)
             union = np.logical_or(pred, mask)
@@ -193,8 +195,7 @@ def inference(test_loader, model, args):
                 pred = np.array(pred*255, dtype=np.uint8)
                 sent = "_".join(sent[0].split(" "))
                 pred_name = '{}-iou={:.2f}-{}.png'.format(seg_id, iou*100, sent)
-                cv2.imwrite(filename=os.path.join(args.vis_dir, pred_name),
-                            img=pred)
+                cv2.imwrite(filename=os.path.join(args.vis_dir, pred_name), img=get_seg_image(param['ori_img'][0].cpu().numpy(), pred))
     logger.info('=> Metric Calculation <=')
     iou_list = np.stack(iou_list)
     iou_list = torch.from_numpy(iou_list).to(img.device)

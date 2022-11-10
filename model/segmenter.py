@@ -54,9 +54,20 @@ class CRIS(nn.Module):
         if self.training:
             # resize mask
             if pred.shape[-2:] != mask.shape[-2:]:
-                mask = F.interpolate(mask, pred.shape[-2:],
-                                     mode='nearest').detach()
-            loss = F.binary_cross_entropy_with_logits(pred, mask)
+                mask = F.interpolate(mask, pred.shape[-2:], mode='nearest').detach()
+
+            # Ratio Augmentation
+            total_area = mask.shape[2] * mask.shape[3]
+            coef = 1 - (mask.sum(dim=(2,3)) / total_area)
+
+            # Generate weight
+            weight = mask * 0.5 + 1
+
+            loss = F.binary_cross_entropy_with_logits(pred, mask, weight=weight)
+
+            # loss = F.binary_cross_entropy_with_logits(pred, mask, reduction="none").sum(dim=(2,3))
+            # loss = torch.dot(coef.squeeze(), loss.squeeze()) / (mask.shape[0] * mask.shape[2] * mask.shape[3])
+
             return pred.detach(), mask, loss
         else:
             return pred.detach()

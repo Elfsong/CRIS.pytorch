@@ -35,6 +35,11 @@ info = {
         'train': 44822,
         'val': 5000,
         'val-test': 5000
+    },
+    'cocostuff': {
+        "train": 965042,
+        'val': 42095,
+        'val-test': 42095
     }
 }
 _tokenizer = _Tokenizer()

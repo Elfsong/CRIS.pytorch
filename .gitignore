@@ -1,0 +1,5 @@
+datasets/*
+exp/*
+wandb/*
+__pycache__/
+pretrain/
